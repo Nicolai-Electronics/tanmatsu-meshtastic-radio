@@ -1,7 +1,8 @@
-//#define SDA 6
-//#define SCL 7
-//#define I2C_SDA SDA
-//#define I2C_SCL SCL
+#define HAS_WIRE 0
+#undef SDA
+#undef SCL
+#undef I2C_SDA
+#undef I2C_SCL
 
 #define USE_RF95
 #define LORA_SCK 0
@@ -12,7 +13,7 @@
 #define LORA_DIO0 -1
 #define LORA_DIO1 4
 #define LORA_DIO4 5
-#define LORA_RESET 9
+#define LORA_RESET 10
 
 #define USE_SX1262
 #define SX126X_CS LORA_CS
@@ -26,3 +27,5 @@
 #define HAS_GPS 0
 #undef GPS_RX_PIN
 #undef GPS_TX_PIN
+
+#define HAS_SCREEN 0
