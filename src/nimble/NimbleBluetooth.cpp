@@ -202,8 +202,10 @@ void NimbleBluetooth::setup()
     // NimbleBluetooth::clearBonds();
 
     LOG_INFO("Init the NimBLE bluetooth module");
+    LOG_INFO("Device name: %s", getDeviceName());
 
     NimBLEDevice::init(getDeviceName());
+    NimBLEDevice::getAdvertising()->setName(getDeviceName());
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
 
     if (config.bluetooth.mode != meshtastic_Config_BluetoothConfig_PairingMode_NO_PIN) {
