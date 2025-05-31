@@ -83,7 +83,7 @@ if platform.name == "espressif32":
 
 if platform.name == "nordicnrf52":
     env.AddPostAction("$BUILD_DIR/${PROGNAME}.hex",
-                      env.VerboseAction(f"{sys.executable} ./bin/uf2conv.py $BUILD_DIR/firmware.hex -c -f 0xADA52840 -o $BUILD_DIR/firmware.uf2",
+                      env.VerboseAction(f"\"{sys.executable}\" ./bin/uf2conv.py $BUILD_DIR/firmware.hex -c -f 0xADA52840 -o $BUILD_DIR/firmware.uf2",
                                         "Generating UF2 file"))
 
 verPropFile = "version.properties"
@@ -99,6 +99,7 @@ except Exception as e:
 
 verObj = readProps(prefsLoc)
 print("Using meshtastic platformio-custom.py, firmware version " + verObj["long"] + " on " + env.get("PIOENV"))
+appEnv = env.get("PIOENV")
 
 jsonLoc = env["PROJECT_DIR"] + "/userPrefs.jsonc"
 with open(jsonLoc) as f:
@@ -110,7 +111,7 @@ pref_flags = []
 for pref in userPrefs:
     if userPrefs[pref].startswith("{"):
         pref_flags.append("-D" + pref + "=" + userPrefs[pref])
-    elif userPrefs[pref].replace(".", "").isdigit():
+    elif userPrefs[pref].lstrip("-").replace(".", "").isdigit():
         pref_flags.append("-D" + pref + "=" + userPrefs[pref])
     elif userPrefs[pref] == "true" or userPrefs[pref] == "false":
         pref_flags.append("-D" + pref + "=" + userPrefs[pref])
@@ -135,3 +136,8 @@ if projenv:
     projenv.Append(CCFLAGS=flags)
 
 env.Append(CCFLAGS=flags)
+
+for lb in env.GetLibBuilders():
+    if lb.name == "meshtastic-device-ui":
+        lb.env.Append(CPPDEFINES=[("APP_VERSION", verObj["long"])])
+        break

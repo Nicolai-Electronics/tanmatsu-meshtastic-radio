@@ -1,6 +1,6 @@
 #include "configuration.h"
 
-#if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+#if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR && __has_include("INA226.h")
 
 #include "../mesh/generated/meshtastic/telemetry.pb.h"
 #include "INA226.h"
@@ -40,14 +40,14 @@ bool INA226Sensor::getMetrics(meshtastic_Telemetry *measurement)
     measurement->variant.environment_metrics.has_current = true;
 
     // mV conversion to V
-    measurement->variant.environment_metrics.voltage = ina226.getBusVoltage() / 1000;
+    measurement->variant.environment_metrics.voltage = ina226.getBusVoltage();
     measurement->variant.environment_metrics.current = ina226.getCurrent_mA();
     return true;
 }
 
 uint16_t INA226Sensor::getBusVoltageMv()
 {
-    return lround(ina226.getBusVoltage());
+    return lround(ina226.getBusVoltage() * 1000);
 }
 
 int16_t INA226Sensor::getCurrentMa()

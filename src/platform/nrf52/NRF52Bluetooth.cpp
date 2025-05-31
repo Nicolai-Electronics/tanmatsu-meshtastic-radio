@@ -44,11 +44,7 @@ class BluetoothPhoneAPI : public PhoneAPI
     }
 
     /// Check the current underlying physical link to see if the client is currently connected
-    virtual bool checkIsConnected() override
-    {
-        BLEConnection *connection = Bluefruit.Connection(connectionHandle);
-        return connection->connected();
-    }
+    virtual bool checkIsConnected() override { return Bluefruit.connected(connectionHandle); }
 };
 
 static BluetoothPhoneAPI *bluetoothPhoneAPI;
@@ -61,6 +57,9 @@ void onConnect(uint16_t conn_handle)
     char central_name[32] = {0};
     connection->getPeerName(central_name, sizeof(central_name));
     LOG_INFO("BLE Connected to %s", central_name);
+
+    // Notify UI (or any other interested firmware components)
+    bluetoothStatus->updateStatus(new meshtastic::BluetoothStatus(meshtastic::BluetoothStatus::ConnectionState::CONNECTED));
 }
 /**
  * Callback invoked when a connection is dropped
@@ -73,6 +72,9 @@ void onDisconnect(uint16_t conn_handle, uint8_t reason)
     if (bluetoothPhoneAPI) {
         bluetoothPhoneAPI->close();
     }
+
+    // Notify UI (or any other interested firmware components)
+    bluetoothStatus->updateStatus(new meshtastic::BluetoothStatus(meshtastic::BluetoothStatus::ConnectionState::DISCONNECTED));
 }
 void onCccd(uint16_t conn_hdl, BLECharacteristic *chr, uint16_t cccd_value)
 {
@@ -208,14 +210,8 @@ void NRF52Bluetooth::shutdown()
 {
     // Shutdown bluetooth for minimum power draw
     LOG_INFO("Disable NRF52 bluetooth");
-    uint8_t connection_num = Bluefruit.connected();
-    if (connection_num) {
-        for (uint8_t i = 0; i < connection_num; i++) {
-            LOG_INFO("NRF52 bluetooth disconnecting handle %d", i);
-            Bluefruit.disconnect(i);
-        }
-        delay(100); // wait for ondisconnect;
-    }
+    Bluefruit.Security.setPairPasskeyCallback(NRF52Bluetooth::onUnwantedPairing); // Actively refuse (during factory reset)
+    disconnect();
     Bluefruit.Advertising.stop();
 }
 void NRF52Bluetooth::startDisabled()
@@ -320,7 +316,17 @@ bool NRF52Bluetooth::onPairingPasskey(uint16_t conn_handle, uint8_t const passke
 {
     LOG_INFO("BLE pair process started with passkey %.3s %.3s", passkey, passkey + 3);
     powerFSM.trigger(EVENT_BLUETOOTH_PAIR);
-#if !defined(MESHTASTIC_EXCLUDE_SCREEN)
+
+    // Get passkey as string
+    // Note: possible leading zeros
+    std::string textkey;
+    for (uint8_t i = 0; i < 6; i++)
+        textkey += (char)passkey[i];
+
+    // Notify UI (or other components) of pairing event and passkey
+    bluetoothStatus->updateStatus(new meshtastic::BluetoothStatus(textkey));
+
+#if !defined(MESHTASTIC_EXCLUDE_SCREEN) // Todo: migrate this display code back into Screen class, and observe bluetoothStatus
     screen->startAlert([](OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y) -> void {
         char btPIN[16] = "888888";
         snprintf(btPIN, sizeof(btPIN), "%06u", configuredPasskey);
@@ -357,12 +363,47 @@ bool NRF52Bluetooth::onPairingPasskey(uint16_t conn_handle, uint8_t const passke
     LOG_INFO("BLE passkey pair: match_request=%i", match_request);
     return true;
 }
+
+// Actively refuse new BLE pairings
+// After clearing bonds (at factory reset), clients seem initially able to attempt to re-pair, even with advertising disabled.
+// On NRF52Bluetooth::shutdown, we change the pairing callback to this method, to aggressively refuse any connection attempts.
+bool NRF52Bluetooth::onUnwantedPairing(uint16_t conn_handle, uint8_t const passkey[6], bool match_request)
+{
+    NRF52Bluetooth::disconnect();
+    return false;
+}
+
+// Disconnect any BLE connections
+void NRF52Bluetooth::disconnect()
+{
+    uint8_t connection_num = Bluefruit.connected();
+    if (connection_num) {
+        // Close all connections. We're only expecting one.
+        for (uint8_t i = 0; i < connection_num; i++)
+            Bluefruit.disconnect(i);
+
+        // Wait for disconnection
+        while (Bluefruit.connected())
+            yield();
+
+        LOG_INFO("Ended BLE connection");
+    }
+}
+
 void NRF52Bluetooth::onPairingCompleted(uint16_t conn_handle, uint8_t auth_status)
 {
-    if (auth_status == BLE_GAP_SEC_STATUS_SUCCESS)
+    if (auth_status == BLE_GAP_SEC_STATUS_SUCCESS) {
         LOG_INFO("BLE pair success");
-    else
+        bluetoothStatus->updateStatus(
+            new meshtastic::BluetoothStatus(meshtastic::BluetoothStatus::ConnectionState::DISCONNECTED));
+    } else {
         LOG_INFO("BLE pair failed");
+        // Notify UI (or any other interested firmware components)
+        bluetoothStatus->updateStatus(
+            new meshtastic::BluetoothStatus(meshtastic::BluetoothStatus::ConnectionState::DISCONNECTED));
+    }
+
+    // Todo: migrate this display code back into Screen class, and observe bluetoothStatus
     screen->endAlert();
 }
 
