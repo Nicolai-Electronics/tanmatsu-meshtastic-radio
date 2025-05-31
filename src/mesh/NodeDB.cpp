@@ -782,6 +782,15 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.ambient_lighting.green = (myNodeInfo.my_node_num & 0x00FF00) >> 8;
     moduleConfig.ambient_lighting.blue = myNodeInfo.my_node_num & 0x0000FF;
 
+    #if defined(TANMATSU)
+    moduleConfig.serial.enabled = true;
+    moduleConfig.serial.baud = meshtastic_ModuleConfig_SerialConfig_Serial_Baud_BAUD_38400;
+    moduleConfig.serial.rxd = 18;
+    moduleConfig.serial.txd = 20;
+    moduleConfig.serial.timeout = 1000;
+    moduleConfig.serial.mode = meshtastic_ModuleConfig_SerialConfig_Serial_Mode_PROTO;
+    #endif
+
     initModuleConfigIntervals();
 }
 

@@ -32,3 +32,5 @@ extern float tcxoVoltage; // make this available everywhere
 #undef GPS_TX_PIN
 
 #define HAS_SCREEN 0
+
+#define TANMATSU
